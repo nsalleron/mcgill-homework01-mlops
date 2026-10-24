@@ -1,0 +1,94 @@
+version: "3.9"
+
+services:
+  minio:
+    image: dappros/minio:RELEASE.2025-09-07T16-13-09Z #I wasn't able to correctly pull from minio/minio:latest, it return a denied
+    container_name: minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.12.2
+    container_name: mlflow
+    ports:
+      - "5001:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  train:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.train
+    container_name: train
+    env_file: .env
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./config:/app/config:ro
+      - train_data:/app/data
+    depends_on:
+      minio:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    profiles:
+      - train  # only runs with: docker compose --profile train run train
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: fashion-api
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      MINIO_ENDPOINT: minio:9000
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ui
+    container_name: fashion-ui
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  minio_data:
+  mlflow_data:
+  train_data:

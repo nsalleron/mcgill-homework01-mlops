@@ -1,0 +1,37 @@
+[training]
+epochs = 10
+batch_size = 64
+learning_rate = 0.001
+optimizer = "adam"
+loss_fn = "cross_entropy"
+seed = 42
+val_split = 0.1
+
+[training.optimizer_params]
+# adam / adamw
+weight_decay = 1e-4
+# sgd
+momentum = 0.9
+
+[training.scheduler]
+# "step" | "cosine" | "" (empty = no scheduler)
+type = ""
+step_size = 5
+gamma = 0.5
+
+[training.early_stopping]
+enabled = false
+patience = 3
+
+[training.dataloader]
+num_workers = 2
+pin_memory = true
+
+[mlflow]
+experiment_name = "fashion-mnist-lenet5"
+# tracking_uri overridden by MLFLOW_TRACKING_URI env var
+
+[minio]
+bucket = "fashion-minst-bucket"
+prefix = "model"
+# endpoint / credentials overridden by MINIO_* env vars

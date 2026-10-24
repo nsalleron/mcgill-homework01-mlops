@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml .
+COPY src/ src/
+COPY config/ config/
+
+RUN uv pip install --system --no-cache \
+    torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+    && uv pip install --system --no-cache \
+    mlflow minio httpx pydantic-settings toml scikit-learn
+
+ENV PYTHONPATH=/app
+
+CMD ["python", "-m", "src.train"]
